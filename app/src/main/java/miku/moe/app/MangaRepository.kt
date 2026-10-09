@@ -132,7 +132,7 @@ object MangaRepository {
                 if (item.slug != manga.slug && !out.containsKey(key)) out[key] = item
             }
         }
-        ArrayList(out.values.take(8))
+        ArrayList(out.values.take(30))
     }
 
     suspend fun detailCoreData(base: MangaPost): MangaDetailCoreData = coroutineScope {

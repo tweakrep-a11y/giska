@@ -18,7 +18,6 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,8 +40,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
@@ -51,10 +52,12 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -66,12 +69,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -92,6 +92,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -105,6 +106,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import coil.compose.SubcomposeAsyncImage
 import coil.request.ImageRequest
+import com.google.android.material.color.MaterialColors
 import java.util.ArrayList
 import java.util.concurrent.CompletableFuture
 import kotlin.coroutines.resume
@@ -116,6 +118,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 class MangaDetailV4Fragment : Fragment() {
 
     private var initialManga: MangaPost? = null
+    private var systemBarsApplied = false
 
     companion object {
         @JvmStatic
@@ -138,11 +141,26 @@ class MangaDetailV4Fragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        applyV4SystemBars()
+
         val viewModel = ViewModelProvider(requireActivity())
             .get(MangaDetailViewModel::class.java)
 
         val swipeRefreshLayout = SwipeRefreshLayout(requireContext()).apply {
-            setColorSchemeColors(android.graphics.Color.rgb(0, 107, 95))
+            setColorSchemeColors(
+                MaterialColors.getColor(
+                    requireContext(),
+                    androidx.appcompat.R.attr.colorPrimary,
+                    android.graphics.Color.rgb(103, 80, 164)
+                )
+            )
+            setProgressBackgroundColorSchemeColor(
+                MaterialColors.getColor(
+                    requireContext(),
+                    com.google.android.material.R.attr.colorSurface,
+                    android.graphics.Color.rgb(28, 27, 32)
+                )
+            )
         }
 
         val composeView = ComposeView(requireContext()).apply {
@@ -171,6 +189,7 @@ class MangaDetailV4Fragment : Fragment() {
 
             DisposableEffect(swipeRefreshLayout) {
                 swipeRefreshLayout.setOnRefreshListener(refresh)
+
                 onDispose {
                     swipeRefreshLayout.setOnRefreshListener(null)
                     swipeRefreshLayout.setOnChildScrollUpCallback(null)
@@ -206,6 +225,43 @@ class MangaDetailV4Fragment : Fragment() {
         return swipeRefreshLayout
     }
 
+    override fun onResume() {
+        super.onResume()
+        applyV4SystemBars()
+    }
+
+    override fun onPause() {
+        restoreV4SystemBars()
+        super.onPause()
+    }
+
+    override fun onDestroyView() {
+        restoreV4SystemBars()
+        super.onDestroyView()
+    }
+
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
+        if (hidden) {
+            restoreV4SystemBars()
+        } else {
+            applyV4SystemBars()
+        }
+    }
+
+    private fun applyV4SystemBars() {
+        val host = activity ?: return
+        ThemeManager.applySystemBars(host)
+        systemBarsApplied = true
+    }
+
+    private fun restoreV4SystemBars() {
+        val host = activity ?: return
+        if (!systemBarsApplied) return
+        ThemeManager.applySystemBars(host)
+        systemBarsApplied = false
+    }
+
     private fun openChapter(
         manga: MangaPost,
         chapter: MangaChapter,
@@ -213,6 +269,7 @@ class MangaDetailV4Fragment : Fragment() {
     ) {
         val list = ArrayList(chapters)
         val exactPosition = list.indexOfFirst { it === chapter }
+
         val position = if (exactPosition >= 0) {
             exactPosition
         } else {
@@ -254,45 +311,84 @@ class MangaDetailV4Fragment : Fragment() {
 
 @Composable
 private fun DetailV4Theme(content: @Composable () -> Unit) {
-    val colors = if (isSystemInDarkTheme()) {
-        darkColorScheme(
-            primary = Color(0xFF80D5C5),
-            onPrimary = Color(0xFF00382F),
-            primaryContainer = Color(0xFF005047),
-            onPrimaryContainer = Color(0xFFA0F2E2),
-            secondary = Color(0xFFE3C48E),
-            onSecondary = Color(0xFF402D09),
-            background = Color(0xFF111715),
-            onBackground = Color(0xFFE1E9E3),
-            surface = Color(0xFF111715),
-            onSurface = Color(0xFFE1E9E3),
-            surfaceVariant = Color(0xFF3F4944),
-            onSurfaceVariant = Color(0xFFBFC9C2),
-            surfaceContainer = Color(0xFF1C2420),
-            surfaceContainerHigh = Color(0xFF26302B),
-            outline = Color(0xFF89958D),
-            outlineVariant = Color(0xFF3F4944)
-        )
-    } else {
-        lightColorScheme(
-            primary = Color(0xFF006B5F),
-            onPrimary = Color.White,
-            primaryContainer = Color(0xFF9BF2DE),
-            onPrimaryContainer = Color(0xFF002019),
-            secondary = Color(0xFF725A2D),
-            onSecondary = Color.White,
-            background = Color(0xFFFAFAF4),
-            onBackground = Color(0xFF191D19),
-            surface = Color(0xFFFAFAF4),
-            onSurface = Color(0xFF191D19),
-            surfaceVariant = Color(0xFFDCE5DC),
-            onSurfaceVariant = Color(0xFF404942),
-            surfaceContainer = Color(0xFFEEF2E9),
-            surfaceContainerHigh = Color(0xFFE5EAE1),
-            outline = Color(0xFF707B73),
-            outlineVariant = Color(0xFFC0C9C0)
-        )
+    val context = LocalContext.current
+
+    fun themeColor(attr: Int, fallback: Int): Color {
+        return Color(MaterialColors.getColor(context, attr, fallback))
     }
+
+    val surface = themeColor(
+        com.google.android.material.R.attr.colorSurface,
+        0xFF1C1B20.toInt()
+    )
+
+    val onSurface = themeColor(
+        com.google.android.material.R.attr.colorOnSurface,
+        0xFFF2EEF5.toInt()
+    )
+
+    val colors = darkColorScheme(
+        primary = themeColor(
+            androidx.appcompat.R.attr.colorPrimary,
+            0xFFFF78C8.toInt()
+        ),
+        onPrimary = themeColor(
+            com.google.android.material.R.attr.colorOnPrimary,
+            0xFF31111F.toInt()
+        ),
+        primaryContainer = themeColor(
+            com.google.android.material.R.attr.colorPrimaryContainer,
+            0xFF5B2F4B.toInt()
+        ),
+        onPrimaryContainer = themeColor(
+            com.google.android.material.R.attr.colorOnPrimaryContainer,
+            0xFFFFD7EC.toInt()
+        ),
+        secondary = themeColor(
+            com.google.android.material.R.attr.colorSecondary,
+            0xFFB7C7FF.toInt()
+        ),
+        onSecondary = themeColor(
+            com.google.android.material.R.attr.colorOnSecondary,
+            0xFF1F293D.toInt()
+        ),
+        secondaryContainer = themeColor(
+            com.google.android.material.R.attr.colorSecondaryContainer,
+            0xFF3D4563.toInt()
+        ),
+        onSecondaryContainer = themeColor(
+            com.google.android.material.R.attr.colorOnSecondaryContainer,
+            0xFFE0E6FF.toInt()
+        ),
+        background = surface,
+        onBackground = onSurface,
+        surface = surface,
+        onSurface = onSurface,
+        surfaceVariant = themeColor(
+            com.google.android.material.R.attr.colorSurfaceVariant,
+            0xFF302830.toInt()
+        ),
+        surfaceContainer = themeColor(
+            com.google.android.material.R.attr.colorSurfaceContainer,
+            0xFF262429.toInt()
+        ),
+        surfaceContainerHigh = themeColor(
+            com.google.android.material.R.attr.colorSurfaceContainerHigh,
+            0xFF2E2B31.toInt()
+        ),
+        onSurfaceVariant = themeColor(
+            com.google.android.material.R.attr.colorOnSurfaceVariant,
+            0xFFD0C7D2.toInt()
+        ),
+        outline = themeColor(
+            com.google.android.material.R.attr.colorOutline,
+            0xFF938F99.toInt()
+        ),
+        outlineVariant = themeColor(
+            com.google.android.material.R.attr.colorOutlineVariant,
+            0xFF4A4450.toInt()
+        )
+    )
 
     MaterialTheme(colorScheme = colors, content = content)
 }
@@ -328,29 +424,36 @@ private fun DetailV4Screen(
     var loading by remember(sourceId, slug) { mutableStateOf(true) }
     var error by remember(sourceId, slug) { mutableStateOf<String?>(null) }
     var favorite by remember(sourceId, slug) {
-        mutableStateOf(initial?.let {
-            MangaFavoriteManager.isFavorite(context, it)
-        } ?: false)
+        mutableStateOf(
+            initial?.let {
+                MangaFavoriteManager.isFavorite(context, it)
+            } ?: false
+        )
     }
     var historyVersion by remember { mutableIntStateOf(0) }
     var selected by rememberSaveable(sourceId, slug) { mutableIntStateOf(0) }
 
+    val headerState = rememberScrollState()
     val infoState = rememberLazyListState()
     val browserState = rememberLazyListState()
+    val relatedState = rememberLazyListState()
 
     DisposableEffect(context, lifecycleOwner, sourceId, slug) {
         val prefs = context.getSharedPreferences(
             "miku_manga_history",
             Context.MODE_PRIVATE
         )
+
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == "items" || key == "chapter_progress") {
                 historyVersion++
             }
         }
+
         val roomListener = MangaRoomEvents.Listener {
             historyVersion++
         }
+
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 historyVersion++
@@ -373,6 +476,7 @@ private fun DetailV4Screen(
 
     LaunchedEffect(sourceId, slug, refreshKey) {
         val base = initial
+
         if (base == null) {
             loading = false
             error = "Data manga tidak tersedia."
@@ -386,17 +490,22 @@ private fun DetailV4Screen(
         try {
             val result = viewModel.loadDetailData(base).awaitDetailV4()
             val loaded = result.detail ?: base
+
             loaded.totalChapters = maxOf(
                 loaded.totalChapters,
                 result.chapters.size
             )
+
             manga = loaded
             chapters = result.chapters.toList()
             genres = result.genres.toList()
             related = result.related.filterNot {
                 it.getSourceId() == loaded.getSourceId() &&
                     it.slug == loaded.slug
-            }.distinctBy { it.getSourceId() to it.slug }
+            }.distinctBy {
+                it.getSourceId() to it.slug
+            }
+
             favorite = MangaFavoriteManager.isFavorite(context, loaded)
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -410,16 +519,40 @@ private fun DetailV4Screen(
         }
     }
 
+    LaunchedEffect(
+        selected,
+        headerState,
+        infoState,
+        browserState,
+        relatedState
+    ) {
+        snapshotFlow {
+            val contentAtTop = when (selected) {
+                0 -> !infoState.canScrollBackward
+                1 -> !browserState.canScrollBackward
+                else -> !relatedState.canScrollBackward
+            }
+
+            !headerState.canScrollBackward && contentAtTop
+        }.collect(onScrollState)
+    }
+
     val active = manga
+
     val lastIndex = remember(active, historyVersion) {
         active?.let {
             MangaHistoryManager.getLastReadChapterIndex(context, it)
         } ?: -1f
     }
+
     val resumeChapter = remember(chapters, lastIndex) {
-        chapters.firstOrNull { abs(it.index - lastIndex) < 0.001f }
-            ?: chapters.minByOrNull { it.index }
+        chapters.firstOrNull {
+            abs(it.index - lastIndex) < 0.001f
+        } ?: chapters.minByOrNull {
+            it.index
+        }
     }
+
     val hasResume = resumeChapter != null &&
         lastIndex >= 0f &&
         abs(resumeChapter.index - lastIndex) < 0.001f
@@ -447,7 +580,9 @@ private fun DetailV4Screen(
                     type = "text/plain"
                     putExtra(Intent.EXTRA_TEXT, detailShareUrlV4(context, it))
                 }
-                context.startActivity(Intent.createChooser(intent, "Bagikan manga"))
+                context.startActivity(
+                    Intent.createChooser(intent, "Bagikan manga")
+                )
             } catch (_: Exception) {
                 Toast.makeText(
                     context,
@@ -459,9 +594,14 @@ private fun DetailV4Screen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onSurface,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            Surface {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurface
+            ) {
                 Column {
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 4.dp),
@@ -473,17 +613,16 @@ private fun DetailV4Screen(
                                 contentDescription = "Kembali"
                             )
                         }
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "MIKU MOE / LIBRARY",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Text(
-                                "Detail manga",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                        }
+
+                        Text(
+                            "Detail manga",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
                         IconButton(
                             onClick = toggleFavorite,
                             enabled = active != null
@@ -492,9 +631,13 @@ private fun DetailV4Screen(
                                 targetValue = if (favorite) 1.12f else 1f,
                                 label = "favoriteScaleV4"
                             )
+
                             Icon(
-                                if (favorite) Icons.Default.Favorite
-                                else Icons.Default.FavoriteBorder,
+                                if (favorite) {
+                                    Icons.Default.Favorite
+                                } else {
+                                    Icons.Default.FavoriteBorder
+                                },
                                 contentDescription = if (favorite) {
                                     "Hapus dari favorit"
                                 } else {
@@ -508,16 +651,28 @@ private fun DetailV4Screen(
                                 modifier = Modifier.scale(scale)
                             )
                         }
-                        IconButton(onClick = share, enabled = active != null) {
+
+                        IconButton(
+                            onClick = share,
+                            enabled = active != null
+                        ) {
                             Icon(
                                 Icons.Default.Share,
                                 contentDescription = "Bagikan manga"
                             )
                         }
                     }
-                    HorizontalDivider()
+
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
                     if (loading) {
-                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                        )
                     }
                 }
             }
@@ -525,44 +680,67 @@ private fun DetailV4Screen(
         bottomBar = {
             Surface(
                 color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 3.dp
+                contentColor = MaterialTheme.colorScheme.onSurface
             ) {
-                Box(
-                    Modifier.fillMaxWidth().padding(
-                        horizontal = 16.dp,
-                        vertical = 12.dp
-                    ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Button(
-                        onClick = {
-                            if (active != null && resumeChapter != null) {
-                                onChapter(active, resumeChapter, chapters)
-                            }
-                        },
-                        enabled = active != null && resumeChapter != null,
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(
+                Column {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
+                    Box(
+                        Modifier.fillMaxWidth().padding(
                             horizontal = 16.dp,
-                            vertical = 14.dp
+                            vertical = 10.dp
                         ),
-                        modifier = Modifier.widthIn(max = 640.dp).fillMaxWidth()
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null)
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            when {
-                                hasResume ->
-                                    "Lanjut membaca Chapter ${
-                                        MangaChapter.formatIndex(resumeChapter!!.index)
-                                    }"
-                                resumeChapter != null -> "Mulai membaca"
-                                loading -> "Memuat chapter…"
-                                else -> "Chapter belum tersedia"
+                        Button(
+                            onClick = {
+                                if (active != null && resumeChapter != null) {
+                                    onChapter(active, resumeChapter, chapters)
+                                }
                             },
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.labelLarge
-                        )
+                            enabled = active != null && resumeChapter != null,
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                disabledContainerColor =
+                                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                                disabledContentColor =
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            contentPadding = PaddingValues(
+                                horizontal = 16.dp,
+                                vertical = 12.dp
+                            ),
+                            modifier = Modifier.widthIn(max = 640.dp)
+                                .fillMaxWidth()
+                                .heightIn(min = 48.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = null
+                            )
+
+                            Spacer(Modifier.width(10.dp))
+
+                            Text(
+                                when {
+                                    hasResume ->
+                                        "Lanjut membaca Chapter ${
+                                            MangaChapter.formatIndex(
+                                                resumeChapter!!.index
+                                            )
+                                        }"
+                                    resumeChapter != null -> "Mulai membaca"
+                                    loading -> "Memuat chapter…"
+                                    else -> "Chapter belum tersedia"
+                                },
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
                     }
                 }
             }
@@ -571,92 +749,51 @@ private fun DetailV4Screen(
         BoxWithConstraints(
             Modifier.padding(padding).fillMaxSize()
         ) {
-            val wide = maxWidth >= 720.dp
+            val headerMaxHeight = maxHeight * 0.45f
 
-            LaunchedEffect(wide, selected, infoState, browserState) {
-                snapshotFlow {
-                    if (wide) {
-                        !infoState.canScrollBackward &&
-                            !browserState.canScrollBackward
-                    } else if (selected == 0) {
-                        !infoState.canScrollBackward
-                    } else {
-                        !browserState.canScrollBackward
+            Column(Modifier.fillMaxSize()) {
+                if (active == null) {
+                    LazyColumn(
+                        state = infoState,
+                        modifier = Modifier.weight(1f).fillMaxWidth()
+                    ) {
+                        item {
+                            DetailV4Message(
+                                title = "Manga tidak tersedia",
+                                message = error
+                                    ?: "Buka kembali manga dari daftar.",
+                                onRetry = if (initial != null) {
+                                    onRefresh
+                                } else {
+                                    null
+                                }
+                            )
+                        }
                     }
-                }.collect(onScrollState)
-            }
-
-            if (active == null) {
-                LazyColumn(Modifier.fillMaxSize()) {
-                    item {
-                        DetailV4Message(
-                            title = "Manga tidak tersedia",
-                            message = error ?: "Buka kembali manga dari daftar.",
-                            onRetry = if (initial != null) onRefresh else null
-                        )
-                    }
-                }
-            } else if (wide) {
-                Row(
-                    Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.spacedBy(0.dp)
-                ) {
-                    DetailV4Info(
+                } else {
+                    DetailV4Header(
                         manga = active,
-                        genres = genres,
                         chapterCount = chapters.size,
                         loading = loading,
-                        error = error,
-                        onRetry = onRefresh,
-                        onGenre = onGenre,
-                        state = infoState,
-                        modifier = Modifier.weight(0.43f).fillMaxSize()
+                        modifier = Modifier.fillMaxWidth()
+                            .heightIn(max = headerMaxHeight)
+                            .verticalScroll(headerState)
                     )
-                    Box(
-                        Modifier.width(1.dp).fillMaxSize()
-                            .background(MaterialTheme.colorScheme.outlineVariant)
-                    )
-                    Column(Modifier.weight(0.57f).fillMaxSize()) {
-                        DetailV4Tabs(
-                            titles = listOf(
-                                "Chapter (${chapters.size})",
-                                "Serupa (${related.size})"
-                            ),
-                            selected = if (selected == 2) 1 else 0,
-                            onSelect = { selected = if (it == 1) 2 else 1 }
-                        )
-                        DetailV4Browser(
-                            manga = active,
-                            chapters = chapters,
-                            related = related,
-                            showRelated = selected == 2,
-                            loading = loading,
-                            error = error,
-                            historyVersion = historyVersion,
-                            onRetry = onRefresh,
-                            onChapter = onChapter,
-                            onRelated = onRelated,
-                            state = browserState,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-            } else {
-                Column(Modifier.fillMaxSize()) {
+
                     DetailV4Tabs(
-                        titles = listOf(
-                            "Tentang",
-                            "Chapter",
-                            "Serupa"
-                        ),
+                        titles = listOf("Tentang", "Chapter", "Serupa"),
                         selected = selected,
                         onSelect = { selected = it }
                     )
+
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
                     if (selected == 0) {
                         DetailV4Info(
                             manga = active,
                             genres = genres,
-                            chapterCount = chapters.size,
                             loading = loading,
                             error = error,
                             onRetry = onRefresh,
@@ -676,9 +813,134 @@ private fun DetailV4Screen(
                             onRetry = onRefresh,
                             onChapter = onChapter,
                             onRelated = onRelated,
-                            state = browserState,
+                            state = if (selected == 2) {
+                                relatedState
+                            } else {
+                                browserState
+                            },
                             modifier = Modifier.weight(1f)
                         )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DetailV4Header(
+    manga: MangaPost,
+    chapterCount: Int,
+    loading: Boolean,
+    modifier: Modifier
+) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface
+    ) {
+        BoxWithConstraints(
+            Modifier.fillMaxWidth().padding(16.dp)
+        ) {
+            val wide = maxWidth >= 600.dp
+            val coverWidth = (maxWidth * if (wide) 0.16f else 0.27f)
+                .coerceAtMost(if (wide) 112.dp else 96.dp)
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                DetailV4Image(
+                    manga,
+                    Modifier.width(coverWidth)
+                        .aspectRatio(0.68f)
+                        .clip(RoundedCornerShape(6.dp))
+                )
+
+                Column(
+                    Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    DetailV4Section("01", "The story")
+
+                    Text(
+                        manga.title.orEmpty().ifBlank { "Tanpa judul" },
+                        fontFamily = FontFamily.Serif,
+                        style = if (wide) {
+                            MaterialTheme.typography.headlineMedium
+                        } else {
+                            MaterialTheme.typography.titleLarge
+                        },
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.semantics { heading() }
+                    )
+
+                    Text(
+                        manga.author.orEmpty().ifBlank {
+                            "Penulis belum tersedia"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    if (wide) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Box(Modifier.weight(1f)) {
+                                DetailV4Fact("FORMAT", manga.getTypeLabel())
+                            }
+                            Box(Modifier.weight(1f)) {
+                                DetailV4Fact("STATUS", manga.status.orEmpty())
+                            }
+                            Box(Modifier.weight(1f)) {
+                                DetailV4Fact("SUMBER", manga.getSourceLabel())
+                            }
+                            Box(Modifier.weight(1f)) {
+                                DetailV4Fact(
+                                    "CHAPTER",
+                                    if (loading && chapterCount == 0) {
+                                        "Memuat…"
+                                    } else {
+                                        chapterCount.toString()
+                                    }
+                                )
+                            }
+                        }
+                    } else {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(Modifier.weight(1f)) {
+                                DetailV4Fact("FORMAT", manga.getTypeLabel())
+                            }
+                            Box(Modifier.weight(1f)) {
+                                DetailV4Fact("STATUS", manga.status.orEmpty())
+                            }
+                        }
+
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(Modifier.weight(1f)) {
+                                DetailV4Fact("SUMBER", manga.getSourceLabel())
+                            }
+                            Box(Modifier.weight(1f)) {
+                                DetailV4Fact(
+                                    "CHAPTER",
+                                    if (loading && chapterCount == 0) {
+                                        "Memuat…"
+                                    } else {
+                                        chapterCount.toString()
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -692,19 +954,58 @@ private fun DetailV4Tabs(
     selected: Int,
     onSelect: (Int) -> Unit
 ) {
-    TabRow(selectedTabIndex = selected) {
-        titles.forEachIndexed { index, title ->
-            Tab(
-                selected = selected == index,
-                onClick = { onSelect(index) },
-                text = {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(
+                horizontal = 16.dp,
+                vertical = 8.dp
+            ),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            titles.forEachIndexed { index, title ->
+                val isSelected = selected == index
+
+                Button(
+                    onClick = { onSelect(index) },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSelected) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.surface
+                        },
+                        contentColor = if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                    ),
+                    contentPadding = PaddingValues(
+                        horizontal = 6.dp,
+                        vertical = 12.dp
+                    ),
+                    modifier = Modifier.weight(1f)
+                        .heightIn(min = 48.dp)
+                        .semantics {
+                            this.selected = isSelected
+                        }
+                ) {
                     Text(
                         title,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (isSelected) {
+                            FontWeight.Bold
+                        } else {
+                            FontWeight.Medium
+                        },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-            )
+            }
         }
     }
 }
@@ -713,7 +1014,6 @@ private fun DetailV4Tabs(
 private fun DetailV4Info(
     manga: MangaPost,
     genres: List<KomikcastClient.GenreItem>,
-    chapterCount: Int,
     loading: Boolean,
     error: String?,
     onRetry: () -> Unit,
@@ -725,57 +1025,20 @@ private fun DetailV4Info(
         mutableStateOf(false)
     }
 
+    val labels = remember(manga.genre) {
+        manga.genre.orEmpty()
+            .split(",", ";")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+    }
+
     LazyColumn(
         state = state,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                DetailV4Section("01", "The story")
-                Text(
-                    manga.title.orEmpty().ifBlank { "Tanpa judul" },
-                    fontFamily = FontFamily.Serif,
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.semantics { heading() }
-                )
-                Text(
-                    manga.author.orEmpty().ifBlank { "Penulis belum tersedia" },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    val coverWidth = (maxWidth * 0.42f).coerceAtMost(180.dp)
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        DetailV4Image(
-                            manga,
-                            Modifier.width(coverWidth).aspectRatio(0.68f)
-                                .clip(RoundedCornerShape(6.dp))
-                        )
-                        Column(
-                            Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            DetailV4Fact("FORMAT", manga.getTypeLabel())
-                            DetailV4Fact("STATUS", manga.status.orEmpty())
-                            DetailV4Fact("SUMBER", manga.getSourceLabel())
-                            DetailV4Fact(
-                                "CHAPTER",
-                                if (loading && chapterCount == 0) "Memuat…"
-                                else chapterCount.toString()
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
         if (error != null) {
             item {
                 DetailV4Message(
@@ -795,44 +1058,49 @@ private fun DetailV4Info(
         }
 
         item {
-            HorizontalDivider()
-        }
-
-        item {
             Column(
                 Modifier.animateContentSize(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 DetailV4Section("02", "Sinopsis")
+
                 SelectionContainer {
                     Text(
                         manga.synopsis.orEmpty().ifBlank {
-                            if (loading) "Sinopsis sedang dimuat…"
-                            else "Sinopsis belum tersedia."
+                            if (loading) {
+                                "Sinopsis sedang dimuat…"
+                            } else {
+                                "Sinopsis belum tersedia."
+                            }
                         },
                         style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = if (expanded) Int.MAX_VALUE else 6,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+
                 if (!manga.synopsis.isNullOrBlank()) {
                     TextButton(onClick = { expanded = !expanded }) {
-                        Text(if (expanded) "Ringkas" else "Baca selengkapnya")
+                        Text(
+                            if (expanded) "Ringkas" else "Baca selengkapnya"
+                        )
                     }
                 }
             }
         }
 
-        val labels = manga.genre.orEmpty()
-            .split(",", ";")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-            .distinct()
-
         if (labels.isNotEmpty()) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
                     DetailV4Section("03", "Genre")
+
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -841,6 +1109,7 @@ private fun DetailV4Info(
                             val genre = genres.firstOrNull {
                                 it.title.equals(label, true)
                             }
+
                             TextButton(
                                 onClick = {
                                     onGenre(
@@ -853,7 +1122,9 @@ private fun DetailV4Info(
                                 shape = RoundedCornerShape(6.dp),
                                 colors = ButtonDefaults.textButtonColors(
                                     containerColor =
-                                        MaterialTheme.colorScheme.surfaceContainer
+                                        MaterialTheme.colorScheme.surfaceContainer,
+                                    contentColor =
+                                        MaterialTheme.colorScheme.primary
                                 ),
                                 modifier = Modifier.heightIn(min = 48.dp)
                             ) {
@@ -867,9 +1138,15 @@ private fun DetailV4Info(
 
         if (!manga.info.isNullOrBlank()) {
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    HorizontalDivider()
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+
                     DetailV4Section("04", "Catatan & informasi")
+
                     SelectionContainer {
                         Text(
                             manga.info.orEmpty().replace("|", "\n"),
@@ -899,213 +1176,329 @@ private fun DetailV4Browser(
     modifier: Modifier
 ) {
     val context = LocalContext.current
+
     val orderPrefs = remember(context) {
-        context.getSharedPreferences("miku_detail_chapter_prefs", Context.MODE_PRIVATE)
-    }
-    var descending by remember {
-        mutableStateOf(
-            orderPrefs.getBoolean("global_chapter_order_newest_first", false)
+        context.getSharedPreferences(
+            "miku_detail_chapter_prefs",
+            Context.MODE_PRIVATE
         )
     }
+
+    var descending by remember {
+        mutableStateOf(
+            orderPrefs.getBoolean(
+                "global_chapter_order_newest_first",
+                false
+            )
+        )
+    }
+
+    var chapterGrid by remember {
+        mutableStateOf(MangaSettingsManager.isChapterGrid2(context))
+    }
+
     var query by rememberSaveable(manga.slug, manga.getSourceId()) {
         mutableStateOf("")
     }
 
     val shown = remember(chapters, descending, query) {
+        val keyword = query.trim()
+
         val filtered = chapters.filter {
-            query.isBlank() ||
-                it.title.orEmpty().contains(query.trim(), true) ||
-                MangaChapter.formatIndex(it.index).contains(query.trim(), true)
+            keyword.isBlank() ||
+                it.title.orEmpty().contains(keyword, true) ||
+                MangaChapter.formatIndex(it.index).contains(keyword, true)
         }
-        if (descending) filtered.sortedByDescending { it.index }
-        else filtered.sortedBy { it.index }
+
+        if (descending) {
+            filtered.sortedByDescending { it.index }
+        } else {
+            filtered.sortedBy { it.index }
+        }
     }
 
-    Column(modifier.fillMaxSize()) {
-        Column(
-            Modifier.fillMaxWidth().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+    val chapterRows = remember(shown, chapterGrid) {
+        shown.chunked(if (chapterGrid) 2 else 1)
+    }
+
+    val relatedRows = remember(related) {
+        related.chunked(3)
+    }
+
+    LazyColumn(
+        state = state,
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 20.dp)
+    ) {
+        item {
+            Column(
+                Modifier.fillMaxWidth().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Column(Modifier.weight(1f)) {
-                    DetailV4Section(
-                        if (showRelated) "06" else "05",
-                        if (showRelated) "Bacaan berikutnya" else "Daftar chapter"
-                    )
-                    Text(
-                        if (showRelated) "${related.size} judul"
-                        else "${shown.size} dari ${chapters.size} chapter",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                if (!showRelated) {
-                    IconButton(
-                        onClick = {
-                            descending = !descending
-                            orderPrefs.edit()
-                                .putBoolean(
-                                    "global_chapter_order_newest_first",
-                                    descending
-                                ).apply()
-                        }
-                    ) {
-                        Icon(
-                            Icons.Default.SwapVert,
-                            contentDescription = if (descending) {
-                                "Urutkan chapter terlama terlebih dahulu"
-                            } else {
-                                "Urutkan chapter terbaru terlebih dahulu"
-                            }
-                        )
-                    }
-                }
-            }
-
-            if (!showRelated) {
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    label = { Text("Cari nomor atau judul chapter") },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null)
-                    },
-                    trailingIcon = {
-                        if (query.isNotEmpty()) {
-                            IconButton(onClick = { query = "" }) {
-                                Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Hapus pencarian"
-                                )
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    if (descending) "TERBARU → TERLAMA"
-                    else "TERLAMA → TERBARU",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-
-        HorizontalDivider()
-
-        LazyColumn(
-            state = state,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = PaddingValues(bottom = 16.dp)
-        ) {
-            if (error != null) {
-                item {
-                    DetailV4Message("Tidak dapat memuat data", error, onRetry)
-                }
-            }
-
-            if (loading && if (showRelated) related.isEmpty() else chapters.isEmpty()) {
-                item {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Column(
-                        Modifier.fillMaxWidth().padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        CircularProgressIndicator(Modifier.size(32.dp))
-                        Text(
-                            if (showRelated) "Memuat manga serupa…"
-                            else "Memuat daftar chapter…",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            } else if (showRelated) {
-                if (related.isEmpty()) {
-                    item {
-                        DetailV4Message(
-                            "Belum ada rekomendasi",
-                            "Sumber ini belum menyediakan manga serupa."
-                        )
-                    }
-                } else {
-                    itemsIndexed(
-                        related,
-                        key = { index, post ->
-                            "${post.getSourceId()}:${post.slug}:$index"
-                        }
-                    ) { _, post ->
-                        Row(
-                            Modifier.fillMaxWidth()
-                                .clickable { onRelated(post) }
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            DetailV4Image(
-                                post,
-                                Modifier.width(72.dp).aspectRatio(0.68f)
-                                    .clip(RoundedCornerShape(4.dp))
-                            )
-                            Column(
-                                Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    post.title.orEmpty().ifBlank { "Tanpa judul" },
-                                    fontFamily = FontFamily.Serif,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    listOf(
-                                        post.getTypeLabel(),
-                                        post.status.orEmpty(),
-                                        post.getSourceLabel()
-                                    ).filter { it.isNotBlank() }.joinToString(" · "),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                        DetailV4Section(
+                            if (showRelated) "06" else "05",
+                            if (showRelated) {
+                                "Bacaan berikutnya"
+                            } else {
+                                "Daftar chapter"
                             }
+                        )
+
+                        Text(
+                            if (showRelated) {
+                                "${related.size} judul"
+                            } else {
+                                "${shown.size} dari ${chapters.size} chapter"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    if (!showRelated) {
+                        IconButton(
+                            onClick = {
+                                descending = !descending
+                                orderPrefs.edit()
+                                    .putBoolean(
+                                        "global_chapter_order_newest_first",
+                                        descending
+                                    )
+                                    .apply()
+                            }
+                        ) {
                             Icon(
-                                Icons.AutoMirrored.Filled.NavigateNext,
-                                contentDescription = null,
+                                Icons.Default.SwapVert,
+                                contentDescription = if (descending) {
+                                    "Urutkan chapter terlama terlebih dahulu"
+                                } else {
+                                    "Urutkan chapter terbaru terlebih dahulu"
+                                },
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
-                        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+
+                        IconButton(
+                            onClick = {
+                                chapterGrid = !chapterGrid
+                                MangaSettingsManager.setChapterLayout(
+                                    context,
+                                    if (chapterGrid) {
+                                        MangaSettingsManager.CHAPTER_LAYOUT_GRID_2
+                                    } else {
+                                        MangaSettingsManager.CHAPTER_LAYOUT_DEFAULT
+                                    }
+                                )
+                            }
+                        ) {
+                            Icon(
+                                if (chapterGrid) {
+                                    Icons.Default.ViewList
+                                } else {
+                                    Icons.Default.GridView
+                                },
+                                contentDescription = if (chapterGrid) {
+                                    "Tampilkan chapter sebagai daftar"
+                                } else {
+                                    "Tampilkan chapter dalam grid dua kolom"
+                                },
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
-            } else if (shown.isEmpty()) {
+
+                if (!showRelated) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        label = {
+                            Text("Cari nomor atau judul chapter")
+                        },
+                        leadingIcon = {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = null
+                            )
+                        },
+                        trailingIcon = {
+                            if (query.isNotEmpty()) {
+                                IconButton(onClick = { query = "" }) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "Hapus pencarian"
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text(
+                        if (descending) {
+                            "TERBARU → TERLAMA"
+                        } else {
+                            "TERLAMA → TERBARU"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+        }
+
+        if (error != null) {
+            item {
+                DetailV4Message(
+                    "Tidak dapat memuat data",
+                    error,
+                    onRetry
+                )
+            }
+        }
+
+        val hasNoData = if (showRelated) {
+            related.isEmpty()
+        } else {
+            chapters.isEmpty()
+        }
+
+        if (loading && hasNoData) {
+            item {
+                Column(
+                    Modifier.fillMaxWidth().padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Text(
+                        if (showRelated) {
+                            "Memuat manga serupa…"
+                        } else {
+                            "Memuat daftar chapter…"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        } else if (showRelated) {
+            if (related.isEmpty()) {
                 item {
                     DetailV4Message(
-                        if (query.isNotBlank()) "Chapter tidak ditemukan"
-                        else "Belum ada chapter",
-                        if (query.isNotBlank()) {
-                            "Coba nomor atau kata kunci yang berbeda."
-                        } else {
-                            "Tarik layar ke bawah untuk memperbarui."
-                        }
+                        "Belum ada rekomendasi",
+                        "Sumber ini belum menyediakan manga serupa."
                     )
                 }
             } else {
                 itemsIndexed(
-                    shown,
-                    key = { index, chapter ->
-                        "${chapter.slug}:${chapter.index}:$index"
+                    relatedRows,
+                    key = { index, row ->
+                        val first = row.first()
+                        "related:$index:${first.getSourceId()}:${first.slug}"
                     }
-                ) { _, chapter ->
+                ) { _, row ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 16.dp
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        row.forEach { post ->
+                            DetailV4RelatedCard(
+                                post = post,
+                                onClick = { onRelated(post) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        repeat(3 - row.size) {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        } else if (shown.isEmpty()) {
+            item {
+                DetailV4Message(
+                    if (query.isNotBlank()) {
+                        "Chapter tidak ditemukan"
+                    } else {
+                        "Belum ada chapter"
+                    },
+                    if (query.isNotBlank()) {
+                        "Coba nomor atau kata kunci yang berbeda."
+                    } else {
+                        "Tarik layar ke bawah untuk memperbarui."
+                    }
+                )
+            }
+        } else {
+            itemsIndexed(
+                chapterRows,
+                key = { index, row ->
+                    val first = row.first()
+                    "chapter:$index:${first.slug}:${first.index}"
+                }
+            ) { _, row ->
+                if (chapterGrid) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 10.dp
+                        ),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        row.forEach { chapter ->
+                            DetailV4ChapterRow(
+                                manga = manga,
+                                chapter = chapter,
+                                historyVersion = historyVersion,
+                                onClick = {
+                                    onChapter(manga, chapter, chapters)
+                                },
+                                grid = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        repeat(2 - row.size) {
+                            Spacer(Modifier.weight(1f))
+                        }
+                    }
+                } else {
                     DetailV4ChapterRow(
-                        manga,
-                        chapter,
-                        historyVersion,
-                        onClick = { onChapter(manga, chapter, chapters) }
+                        manga = manga,
+                        chapter = row.first(),
+                        historyVersion = historyVersion,
+                        onClick = {
+                            onChapter(manga, row.first(), chapters)
+                        },
+                        grid = false,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -1114,13 +1507,47 @@ private fun DetailV4Browser(
 }
 
 @Composable
+private fun DetailV4RelatedCard(
+    post: MangaPost,
+    onClick: () -> Unit,
+    modifier: Modifier
+) {
+    Column(
+        modifier.clip(RoundedCornerShape(6.dp))
+            .clickable(onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        DetailV4Image(
+            post,
+            Modifier.fillMaxWidth()
+                .aspectRatio(0.68f)
+                .clip(RoundedCornerShape(6.dp))
+        )
+
+        Text(
+            post.title.orEmpty().ifBlank { "Tanpa judul" },
+            fontFamily = FontFamily.Serif,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+    }
+}
+
+@Composable
 private fun DetailV4ChapterRow(
     manga: MangaPost,
     chapter: MangaChapter,
     historyVersion: Int,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    grid: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+
     val progress = remember(
         historyVersion,
         manga.slug,
@@ -1129,57 +1556,110 @@ private fun DetailV4ChapterRow(
     ) {
         MangaHistoryManager.getProgress(context, manga, chapter.index)
     }
+
     val total = progress?.totalPages ?: 0
+
     val page = if (total > 0 && progress != null) {
         (progress.page + 1).coerceIn(0, total)
     } else {
         0
     }
-    val fraction = if (total > 0) page.toFloat() / total else 0f
+
+    val fraction = if (total > 0) {
+        page.toFloat() / total
+    } else {
+        0f
+    }
+
     val animatedFraction by animateFloatAsState(
         targetValue = fraction,
         label = "chapterProgressV4"
     )
+
     val finished = total > 0 && page >= total
     val hasProgress = total > 0
-    val last = remember(historyVersion, manga.slug, manga.getSourceId()) {
+
+    val last = remember(
+        historyVersion,
+        manga.slug,
+        manga.getSourceId()
+    ) {
         MangaHistoryManager.getLastReadChapterIndex(context, manga)
     }
+
     val current = last >= 0f && abs(last - chapter.index) < 0.001f
 
-    Column(
-        Modifier.fillMaxWidth()
-            .background(
-                if (current) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.surface
-            )
-            .clickable(onClick = onClick)
-            .heightIn(min = 80.dp)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+    val background = when {
+        current -> MaterialTheme.colorScheme.primaryContainer
+        grid -> MaterialTheme.colorScheme.surfaceContainer
+        else -> MaterialTheme.colorScheme.surface
+    }
+
+    val foreground = if (current) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    val secondaryForeground = if (current) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    val accent = if (current) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.primary
+    }
+
+    Column(modifier) {
+        Column(
+            Modifier.fillMaxWidth()
+                .then(
+                    if (grid) {
+                        Modifier.clip(RoundedCornerShape(10.dp))
+                    } else {
+                        Modifier
+                    }
+                )
+                .background(background)
+                .clickable(onClick = onClick)
+                .heightIn(min = if (grid) 132.dp else 80.dp)
+                .padding(
+                    horizontal = if (grid) 12.dp else 16.dp,
+                    vertical = 14.dp
+                ),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                MangaChapter.formatIndex(chapter.index),
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleMedium,
-                color = if (current) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.primary
-                },
-                modifier = Modifier.widthIn(min = 40.dp, max = 92.dp),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            Column(
-                Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+            if (grid) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        MangaChapter.formatIndex(chapter.index),
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = accent,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Icon(
+                        if (finished) {
+                            Icons.Default.CheckCircle
+                        } else {
+                            Icons.AutoMirrored.Filled.NavigateNext
+                        },
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
                 Text(
                     chapter.title.orEmpty().ifBlank {
                         "Chapter ${MangaChapter.formatIndex(chapter.index)}"
@@ -1187,59 +1667,118 @@ private fun DetailV4ChapterRow(
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = if (current) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
+                    color = foreground
                 )
-                Text(
-                    listOf(
+
+                if (!chapter.date.isNullOrBlank()) {
+                    Text(
                         chapter.date.orEmpty(),
-                        when {
-                            finished -> "Selesai"
-                            hasProgress -> "Hal. $page/$total"
-                            current -> "Terakhir dibaca"
-                            else -> "Belum dibaca"
-                        }
-                    ).filter { it.isNotBlank() }.joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (current) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
+                        style = MaterialTheme.typography.bodySmall,
+                        color = secondaryForeground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Text(
+                    when {
+                        finished -> "Selesai"
+                        hasProgress -> "Hal. $page/$total"
+                        current -> "Terakhir dibaca"
+                        else -> "Belum dibaca"
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = secondaryForeground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        MangaChapter.formatIndex(chapter.index),
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = accent,
+                        modifier = Modifier.widthIn(
+                            min = 40.dp,
+                            max = 92.dp
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Column(
+                        Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            chapter.title.orEmpty().ifBlank {
+                                "Chapter ${
+                                    MangaChapter.formatIndex(chapter.index)
+                                }"
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            color = foreground
+                        )
+
+                        Text(
+                            listOf(
+                                chapter.date.orEmpty(),
+                                when {
+                                    finished -> "Selesai"
+                                    hasProgress -> "Hal. $page/$total"
+                                    current -> "Terakhir dibaca"
+                                    else -> "Belum dibaca"
+                                }
+                            ).filter {
+                                it.isNotBlank()
+                            }.joinToString(" · "),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = secondaryForeground
+                        )
+                    }
+
+                    Icon(
+                        if (finished) {
+                            Icons.Default.CheckCircle
+                        } else {
+                            Icons.AutoMirrored.Filled.NavigateNext
+                        },
+                        contentDescription = null,
+                        tint = accent
+                    )
+                }
+            }
+
+            AnimatedVisibility(visible = hasProgress) {
+                LinearProgressIndicator(
+                    progress = { animatedFraction },
+                    modifier = Modifier.fillMaxWidth().height(3.dp),
+                    color = accent,
+                    trackColor = if (current) {
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(
+                            alpha = 0.15f
+                        )
                     } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
+                        MaterialTheme.colorScheme.surfaceContainerHigh
                     }
                 )
             }
-            Icon(
-                if (finished) Icons.Default.CheckCircle
-                else Icons.AutoMirrored.Filled.NavigateNext,
-                contentDescription = null,
-                tint = if (current) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.primary
-                }
-            )
         }
-        AnimatedVisibility(visible = hasProgress) {
-            LinearProgressIndicator(
-                progress = { animatedFraction },
-                modifier = Modifier.fillMaxWidth().height(3.dp),
-                color = if (current) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.primary
-                },
-                trackColor = if (current) {
-                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f)
-                } else {
-                    MaterialTheme.colorScheme.surfaceContainerHigh
-                }
+
+        if (!grid) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant
             )
         }
     }
-    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
 }
 
 @Composable
@@ -1254,27 +1793,34 @@ private fun DetailV4Section(number: String, title: String) {
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary
         )
+
         Text(
             title,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.semantics { heading() }
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f, fill = false)
+                .semantics { heading() }
         )
     }
 }
 
 @Composable
 private fun DetailV4Fact(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
         Text(
             label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
         Text(
             value.ifBlank { "—" },
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -1292,13 +1838,16 @@ private fun DetailV4Message(
         Text(
             title,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
         )
+
         Text(
             message,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
         if (onRetry != null) {
             TextButton(onClick = onRetry) {
                 Text("Coba lagi")
@@ -1308,7 +1857,10 @@ private fun DetailV4Message(
 }
 
 @Composable
-private fun DetailV4Image(post: MangaPost, modifier: Modifier) {
+private fun DetailV4Image(
+    post: MangaPost,
+    modifier: Modifier
+) {
     val context = LocalContext.current
     val url = post.coverImage.orEmpty()
     val sourceId = post.getSourceId()
@@ -1316,6 +1868,7 @@ private fun DetailV4Image(post: MangaPost, modifier: Modifier) {
     val request = remember(context, url, sourceId) {
         val resolved = MangaImageLoader.resolveImageUrl(url, sourceId)
         val key = MangaImageLoader.imageCacheKey(url, sourceId)
+
         val builder = ImageRequest.Builder(context)
             .data(resolved)
             .memoryCacheKey(key)
@@ -1323,9 +1876,13 @@ private fun DetailV4Image(post: MangaPost, modifier: Modifier) {
             .crossfade(true)
 
         val headers = MangaImageLoader.headersFor(resolved, sourceId)
+
         headers.names().forEach { name ->
-            headers[name]?.let { builder.setHeader(name, it) }
+            headers[name]?.let {
+                builder.setHeader(name, it)
+            }
         }
+
         builder.build()
     }
 
@@ -1333,14 +1890,25 @@ private fun DetailV4Image(post: MangaPost, modifier: Modifier) {
         model = request,
         contentDescription = "Sampul ${post.title.orEmpty()}",
         contentScale = ContentScale.Crop,
-        modifier = modifier.background(MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier.background(
+            MaterialTheme.colorScheme.surfaceContainer
+        ),
         loading = {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(Modifier.size(24.dp))
+            Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         },
         error = {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(
                     Icons.AutoMirrored.Filled.MenuBook,
                     contentDescription = "Sampul tidak tersedia",
@@ -1352,8 +1920,12 @@ private fun DetailV4Image(post: MangaPost, modifier: Modifier) {
     )
 }
 
-private fun detailShareUrlV4(context: Context, manga: MangaPost): String {
+private fun detailShareUrlV4(
+    context: Context,
+    manga: MangaPost
+): String {
     val raw = manga.slug.orEmpty().trim()
+
     if (
         raw.startsWith("http://", true) ||
         raw.startsWith("https://", true)
@@ -1362,7 +1934,11 @@ private fun detailShareUrlV4(context: Context, manga: MangaPost): String {
     }
 
     val source = manga.getSourceId()
-    val domain = MangaSettingsManager.getSourceDomain(context, source).trimEnd('/')
+    val domain = MangaSettingsManager.getSourceDomain(
+        context,
+        source
+    ).trimEnd('/')
+
     var path = raw.substringAfter("::", raw).trim()
 
     if (path.isBlank()) return domain
@@ -1403,12 +1979,20 @@ private fun favoriteSnapshotV4(
         manga.getTypeLabel(),
         compactLatest,
         manga.latestChapterDate
-    ).withSource(manga.getSourceId(), manga.getSourceLabel())
+    ).withSource(
+        manga.getSourceId(),
+        manga.getSourceLabel()
+    )
 
     copy.info = manga.info
-    copy.totalChapters = maxOf(manga.totalChapters, chapters.size)
+    copy.totalChapters = maxOf(
+        manga.totalChapters,
+        chapters.size
+    )
 
-    chapters.maxByOrNull { it.index }?.let {
+    chapters.maxByOrNull {
+        it.index
+    }?.let {
         copy.latestChapter = MangaChapter.formatIndex(it.index)
         copy.latestChapterDate = it.date.orEmpty()
     }
