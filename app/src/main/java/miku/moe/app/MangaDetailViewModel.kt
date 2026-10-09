@@ -66,4 +66,22 @@ class MangaDetailViewModel(application: Application) : AndroidViewModel(applicat
         }
         return future
     }
+
+    fun loadMoreRelated(
+        manga: MangaPost,
+        genres: List<KomikcastClient.GenreItem>,
+        page: Int
+    ): CompletableFuture<ArrayList<MangaPost>> {
+        val future = CompletableFuture<ArrayList<MangaPost>>()
+        viewModelScope.launch {
+            try {
+                future.complete(
+                    MangaRepository.relatedPage(getApplication(), manga, genres, page)
+                )
+            } catch (e: Throwable) {
+                future.completeExceptionally(e)
+            }
+        }
+        return future
+    }
 }

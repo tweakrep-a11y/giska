@@ -135,6 +135,31 @@ object MangaRepository {
         ArrayList(out.values.take(30))
     }
 
+    suspend fun relatedPage(
+        context: Context,
+        manga: MangaPost,
+        genres: List<KomikcastClient.GenreItem>,
+        page: Int
+    ): ArrayList<MangaPost> = coroutineScope {
+        val sourceId = manga.getSourceId()
+        val sourceLabel = manga.getSourceLabel()
+        val labels = manga.genre.split(",").map { it.trim() }.filter { it.isNotEmpty() }.take(2)
+        val values = labels.map { label -> genres.firstOrNull { it.title.equals(label, true) }?.value ?: label }
+        val requests = ArrayList<kotlinx.coroutines.Deferred<MangaPage>>()
+        values.forEach { value -> requests.add(async { list(sourceId, page, "latest", "", value) }) }
+        requests.add(async { list(sourceId, page, "popular", "", "") })
+        val out = LinkedHashMap<String, MangaPost>()
+        requests.forEach { task ->
+            task.await().data.forEach { post ->
+                val item = post.withSource(sourceId, sourceLabel)
+                MangaLabelUtils.applyHiddenLabels(context, item)
+                val key = item.getSourceId() + "|" + item.slug
+                if (item.slug != manga.slug && !out.containsKey(key)) out[key] = item
+            }
+        }
+        ArrayList(out.values)
+    }
+
     suspend fun detailCoreData(base: MangaPost): MangaDetailCoreData = coroutineScope {
         val sourceId = base.getSourceId()
         if (sourceDetailWarmsChapter(sourceId)) {

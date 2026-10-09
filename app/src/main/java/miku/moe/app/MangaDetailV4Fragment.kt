@@ -97,6 +97,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -421,6 +422,9 @@ private fun DetailV4Screen(
     var related by remember(sourceId, slug) {
         mutableStateOf<List<MangaPost>>(emptyList())
     }
+    var relatedPage by remember(sourceId, slug) { mutableIntStateOf(1) }
+    var relatedLoadingMore by remember(sourceId, slug) { mutableStateOf(false) }
+    var relatedEndReached by remember(sourceId, slug) { mutableStateOf(false) }
     var loading by remember(sourceId, slug) { mutableStateOf(true) }
     var error by remember(sourceId, slug) { mutableStateOf<String?>(null) }
     var favorite by remember(sourceId, slug) {
@@ -486,6 +490,10 @@ private fun DetailV4Screen(
 
         loading = true
         error = null
+        relatedPage = 1
+        relatedLoadingMore = false
+        relatedEndReached = false
+        related = emptyList()
 
         try {
             val result = viewModel.loadDetailData(base).awaitDetailV4()
@@ -516,6 +524,46 @@ private fun DetailV4Screen(
         } finally {
             loading = false
             onRefreshFinished()
+        }
+    }
+
+    LaunchedEffect(selected, loading, relatedState, sourceId, slug) {
+        if (selected != 2 || loading) return@LaunchedEffect
+
+        snapshotFlow {
+            val info = relatedState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            lastVisible to info.totalItemsCount
+        }.collect { (lastVisible, totalItems) ->
+            if (totalItems == 0 || lastVisible < totalItems - 5) return@collect
+            if (loading || relatedLoadingMore || relatedEndReached) return@collect
+
+            val active = manga ?: return@collect
+            relatedLoadingMore = true
+            try {
+                val nextPage = relatedPage + 1
+                val incoming = viewModel.loadMoreRelated(
+                    active,
+                    genres,
+                    nextPage
+                ).awaitDetailV4()
+                val known = related.map { it.getSourceId() to it.slug }.toHashSet()
+                val newItems = incoming.filter { item ->
+                    item.slug != active.slug && known.add(item.getSourceId() to item.slug)
+                }
+                if (newItems.isEmpty()) {
+                    relatedEndReached = true
+                } else {
+                    related = related + newItems
+                    relatedPage = nextPage
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Throwable) {
+                relatedEndReached = true
+            } finally {
+                relatedLoadingMore = false
+            }
         }
     }
 
@@ -781,6 +829,7 @@ private fun DetailV4Screen(
                             manga = active,
                             chapters = chapters,
                             related = related,
+                            relatedLoadingMore = relatedLoadingMore,
                             showRelated = selected == 2,
                             loading = loading,
                             error = error,
@@ -1142,6 +1191,7 @@ private fun DetailV4Browser(
     manga: MangaPost,
     chapters: List<MangaChapter>,
     related: List<MangaPost>,
+    relatedLoadingMore: Boolean,
     showRelated: Boolean,
     loading: Boolean,
     error: String?,
@@ -1373,6 +1423,20 @@ private fun DetailV4Browser(
                     }
                 }
             }
+            if (relatedLoadingMore) {
+                item(key = "related_loading_more") {
+                    Box(
+                        Modifier.fillMaxWidth().padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            strokeWidth = 2.dp
+                        )
+                    }
+                }
+            }
         } else if (chapters.isEmpty()) {
             item {
                 DetailV4Message(
@@ -1452,7 +1516,6 @@ private fun DetailV4RelatedCard(
 
         Text(
             post.title.orEmpty().ifBlank { "Tanpa judul" },
-            fontFamily = FontFamily.Serif,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -1473,156 +1536,127 @@ private fun DetailV4ChapterRow(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-
-    val progress = remember(
-        historyVersion,
-        manga.slug,
-        manga.getSourceId(),
-        chapter.index
-    ) {
+    val progress = remember(historyVersion, manga.slug, manga.getSourceId(), chapter.index) {
         MangaHistoryManager.getProgress(context, manga, chapter.index)
     }
-
-    val total = progress?.totalPages ?: 0
-    val page = if (total > 0 && progress != null) {
-        (progress.page + 1).coerceIn(0, total)
-    } else {
-        0
-    }
-
-    val fraction = if (total > 0) {
-        page.toFloat() / total
+    val hasProgress = progress != null && progress.totalPages > 0
+    val fraction = if (hasProgress && progress != null) {
+        ((progress.page + 1).toFloat() / progress.totalPages).coerceIn(0f, 1f)
     } else {
         0f
     }
-
-    val animatedFraction by animateFloatAsState(
-        targetValue = fraction,
-        label = "chapterProgressV4"
-    )
-
-    val finished = total > 0 && page >= total
-    val hasProgress = total > 0
-
-    val last = remember(
-        historyVersion,
-        manga.slug,
-        manga.getSourceId()
-    ) {
+    val percent = (fraction * 100f).toInt().coerceIn(0, 100)
+    val isFinished = hasProgress && percent >= 100
+    val lastIndex = remember(historyVersion, manga.slug, manga.getSourceId()) {
         MangaHistoryManager.getLastReadChapterIndex(context, manga)
     }
-
-    val current = last >= 0f &&
-        abs(last - chapter.index) < 0.001f
-
-    val background = when {
-        current -> MaterialTheme.colorScheme.primaryContainer
-        grid -> MaterialTheme.colorScheme.surfaceContainer
-        else -> MaterialTheme.colorScheme.surface
+    val isLastRead = lastIndex >= 0f && abs(lastIndex - chapter.index) < 0.001f
+    val page = if (hasProgress && progress != null) {
+        (progress.page + 1).coerceAtMost(progress.totalPages)
+    } else {
+        0
     }
-
-    val foreground = if (current) {
+    val cardColor = if (isLastRead) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)
+    }
+    val cardContentColor = if (isLastRead) {
         MaterialTheme.colorScheme.onPrimaryContainer
     } else {
         MaterialTheme.colorScheme.onSurface
     }
-
-    val secondaryForeground = if (current) {
+    val secondaryColor = if (isLastRead) {
         MaterialTheme.colorScheme.onPrimaryContainer
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
 
-    val accent = if (current) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
-
-    Column(modifier) {
-        Column(
-            Modifier.fillMaxWidth()
-                .then(
-                    if (grid) {
-                        Modifier.clip(RoundedCornerShape(10.dp))
-                    } else {
-                        Modifier
-                    }
-                )
-                .background(background)
-                .clickable(onClick = onClick)
-                .heightIn(min = if (grid) 132.dp else 80.dp)
-                .padding(
-                    horizontal = if (grid) 12.dp else 16.dp,
-                    vertical = 14.dp
-                ),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    Column(modifier.fillMaxWidth()) {
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = cardColor,
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
         ) {
-            Text(
-                chapter.title.orEmpty().ifBlank {
-                    "Chapter ${MangaChapter.formatIndex(chapter.index)}"
-                },
-                style = if (grid) {
-                    MaterialTheme.typography.titleSmall
-                } else {
-                    MaterialTheme.typography.titleMedium
-                },
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                color = foreground
-            )
-
-            Row(
-                Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
-                Text(
-                    listOf(
-                        chapter.date.orEmpty(),
-                        when {
-                            finished -> "Selesai"
-                            hasProgress -> "Hal. $page/$total"
-                            current -> "Terakhir dibaca"
-                            else -> "Belum dibaca"
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        chapter.title.orEmpty(),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = cardContentColor,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (isFinished) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text(
+                                "Selesai",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1
+                            )
                         }
-                    ).filter {
-                        it.isNotBlank()
-                    }.joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = secondaryForeground,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+                    } else if (hasProgress) {
+                        Text(
+                            "$percent%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1
+                        )
+                    }
+                }
 
-                if (finished) {
-                    Icon(
-                        Icons.Default.CheckCircle,
-                        contentDescription = "Selesai dibaca",
-                        tint = accent,
-                        modifier = Modifier.padding(start = 8.dp)
-                            .size(18.dp)
+                if (!chapter.date.isNullOrBlank() || hasProgress) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            chapter.date.orEmpty(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = secondaryColor,
+                            modifier = Modifier.weight(1f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (hasProgress && progress != null) {
+                            Text(
+                                "Hal. $page/${progress.totalPages}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = secondaryColor,
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+
+                if (hasProgress) {
+                    LinearProgressIndicator(
+                        progress = { fraction },
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
                     )
                 }
             }
-
-            AnimatedVisibility(visible = hasProgress) {
-                LinearProgressIndicator(
-                    progress = { animatedFraction },
-                    modifier = Modifier.fillMaxWidth().height(3.dp),
-                    color = accent,
-                    trackColor = if (current) {
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(
-                            alpha = 0.15f
-                        )
-                    } else {
-                        MaterialTheme.colorScheme.surfaceContainerHigh
-                    }
-                )
-            }
         }
-
         if (!grid) {
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
