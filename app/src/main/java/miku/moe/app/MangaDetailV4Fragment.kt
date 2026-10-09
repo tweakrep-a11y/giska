@@ -689,34 +689,22 @@ private fun DetailV4Screen(
                         onChapter(active, resumeChapter, chapters)
                     }
                 },
-                expanded = true,
-                icon = {
-                    Icon(
-                        Icons.Default.PlayArrow,
-                        contentDescription = null
-                    )
-                },
-                text = {
-                    Text(
-                        when {
-                            hasResume ->
-                                "Lanjut membaca Chapter ${
-                                    MangaChapter.formatIndex(
-                                        resumeChapter!!.index
-                                    )
-                                }"
-                            resumeChapter != null -> "Mulai membaca"
-                            loading -> "Memuat chapter…"
-                            else -> "Chapter belum tersedia"
-                        },
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                enabled = active != null && resumeChapter != null,
                 containerColor = MaterialTheme.colorScheme.primaryContainer,
                 contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-            )
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    when {
+                        hasResume -> "Lanjut membaca Chapter ${MangaChapter.formatIndex(resumeChapter!!.index)}"
+                        resumeChapter != null -> "Mulai membaca"
+                        loading -> "Memuat chapter…"
+                        else -> "Chapter belum tersedia"
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     ) { padding ->
         BoxWithConstraints(
