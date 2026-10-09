@@ -1323,7 +1323,7 @@ private fun DetailV4Image(post: MangaPost, modifier: Modifier) {
             .crossfade(true)
 
         val headers = MangaImageLoader.headersFor(resolved, sourceId)
-        headers.names.forEach { name ->
+        headers.names().forEach { name ->
             headers[name]?.let { builder.setHeader(name, it) }
         }
         builder.build()
