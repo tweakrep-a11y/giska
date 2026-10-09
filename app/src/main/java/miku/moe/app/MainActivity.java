@@ -502,6 +502,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private Fragment createMangaDetailFragment(MangaPost manga) {
+        if (MangaSettingsManager.isDetailUiV8(this)) return MangaDetailV8Fragment.newInstance(manga);
+        if (MangaSettingsManager.isDetailUiV7(this)) return MangaDetailV7Fragment.newInstance(manga);
+        if (MangaSettingsManager.isDetailUiV6(this)) return MangaDetailV6Fragment.newInstance(manga);
+        if (MangaSettingsManager.isDetailUiV5(this)) return MangaDetailV5Fragment.newInstance(manga);
         if (MangaSettingsManager.isDetailUiV4(this)) return MangaDetailV4Fragment.newInstance(manga);
         if (MangaSettingsManager.isDetailUiV3(this)) return MangaDetailV3Fragment.newInstance(manga);
         if (MangaSettingsManager.isDetailUiV2(this)) return MangaDetailV2Fragment.newInstance(manga);

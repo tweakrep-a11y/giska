@@ -46,6 +46,10 @@ public final class MangaSettingsManager {
     public static final String DETAIL_UI_V2 = "v2";
     public static final String DETAIL_UI_V3 = "v3";
     public static final String DETAIL_UI_V4 = "v4";
+    public static final String DETAIL_UI_V5 = "v5";
+    public static final String DETAIL_UI_V6 = "v6";
+    public static final String DETAIL_UI_V7 = "v7";
+    public static final String DETAIL_UI_V8 = "v8";
     public static final String HOME_STYLE_DEFAULT = "default";
     public static final String HOME_STYLE_V1 = "v1";
     public static final String HOME_STYLE_V2 = "v2";
@@ -114,6 +118,10 @@ public final class MangaSettingsManager {
         if (DETAIL_UI_V2.equals(value)) return DETAIL_UI_V2;
         if (DETAIL_UI_V3.equals(value)) return DETAIL_UI_V3;
         if (DETAIL_UI_V4.equals(value)) return DETAIL_UI_V4;
+        if (DETAIL_UI_V5.equals(value)) return DETAIL_UI_V5;
+        if (DETAIL_UI_V6.equals(value)) return DETAIL_UI_V6;
+        if (DETAIL_UI_V7.equals(value)) return DETAIL_UI_V7;
+        if (DETAIL_UI_V8.equals(value)) return DETAIL_UI_V8;
         return DETAIL_UI_V2;
     }
     public static void setDetailUi(Context context, String value) {
@@ -122,14 +130,26 @@ public final class MangaSettingsManager {
         else if (DETAIL_UI_V1.equals(value)) selected = DETAIL_UI_V1;
         else if (DETAIL_UI_V3.equals(value)) selected = DETAIL_UI_V3;
         else if (DETAIL_UI_V4.equals(value)) selected = DETAIL_UI_V4;
+        else if (DETAIL_UI_V5.equals(value)) selected = DETAIL_UI_V5;
+        else if (DETAIL_UI_V6.equals(value)) selected = DETAIL_UI_V6;
+        else if (DETAIL_UI_V7.equals(value)) selected = DETAIL_UI_V7;
+        else if (DETAIL_UI_V8.equals(value)) selected = DETAIL_UI_V8;
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_DETAIL_UI, selected).commit();
     }
     public static boolean isDetailUiV1(Context context) { return DETAIL_UI_V1.equals(getDetailUi(context)); }
     public static boolean isDetailUiV2(Context context) { return DETAIL_UI_V2.equals(getDetailUi(context)); }
     public static boolean isDetailUiV3(Context context) { return DETAIL_UI_V3.equals(getDetailUi(context)); }
     public static boolean isDetailUiV4(Context context) { return DETAIL_UI_V4.equals(getDetailUi(context)); }
+    public static boolean isDetailUiV5(Context context) { return DETAIL_UI_V5.equals(getDetailUi(context)); }
+    public static boolean isDetailUiV6(Context context) { return DETAIL_UI_V6.equals(getDetailUi(context)); }
+    public static boolean isDetailUiV7(Context context) { return DETAIL_UI_V7.equals(getDetailUi(context)); }
+    public static boolean isDetailUiV8(Context context) { return DETAIL_UI_V8.equals(getDetailUi(context)); }
     public static String getDetailUiLabel(Context context) {
         String value = getDetailUi(context);
+        if (DETAIL_UI_V8.equals(value)) return "Manga Detail v8";
+        if (DETAIL_UI_V7.equals(value)) return "Manga Detail v7";
+        if (DETAIL_UI_V6.equals(value)) return "Manga Detail v6";
+        if (DETAIL_UI_V5.equals(value)) return "Manga Detail v5";
         if (DETAIL_UI_V4.equals(value)) return "Manga Detail v4";
         if (DETAIL_UI_V3.equals(value)) return "Manga Detail v3";
         if (DETAIL_UI_V2.equals(value)) return "Manga Detail v2";

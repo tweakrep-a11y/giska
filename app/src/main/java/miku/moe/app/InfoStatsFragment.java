@@ -79,8 +79,8 @@ public class InfoStatsFragment extends Fragment {
     private ImageView uiSettingsArrow, animeSettingsArrow, mangaSettingsArrow, httpsSettingsArrow;
     private RadioGroup animeDetailUiRadioGroup;
     private RadioGroup uiThemeRadioGroup, qualityRadioGroup, externalPlayerRadioGroup, animeHomeStyleRadioGroup, mangaHomeStyleRadioGroup, mangaGridRadioGroup, chapterLayoutRadioGroup, mangaReaderUiRadioGroup, mangaDetailUiRadioGroup, mangaReaderImageScaleRadioGroup, downloaderPlatformGroup, dohProviderRadioGroup;
-    private RadioButton mangaDetailUiV3Radio, mangaDetailUiV4Radio;
-    private android.view.View mangaDetailUiV3Row, mangaDetailUiV4Row;
+    private RadioButton mangaDetailUiV3Radio, mangaDetailUiV4Radio, mangaDetailUiV5Radio, mangaDetailUiV6Radio, mangaDetailUiV7Radio, mangaDetailUiV8Radio;
+    private android.view.View mangaDetailUiV3Row, mangaDetailUiV4Row, mangaDetailUiV5Row, mangaDetailUiV6Row, mangaDetailUiV7Row, mangaDetailUiV8Row;
     private LinearLayout mangaSourceCheckGroup, animeSourceCheckGroup, uiSettingsContent, animeSettingsContent, mangaSettingsContent, httpsSettingsContent;
     private CheckBox animeSourceDefaultCheck, animeSourceAnimekuCheck, animeSourceAnimeloverzCheck, animeSourceDramoraCheck, mangaSourceKomikcastCheck, mangaSourceShinigamiCheck, mangaSourceDoujindesuCheck, mangaSourceWestmangaCheck, mangaSourceBacakomikCheck, mangaSourceKomikindoCheck, mangaSourceIkiruCheck, mangaSourceKomikuCheck, mangaSourceMangasusuCheck, mangaSourceKomikuOrgCheck, mangaSourceCosmicScansCheck, mangaSourceKiryuuOfficialCheck, mangaSourceNatsuCheck, mangaSourceAinzscanssCheck, mangaSourceApkomikCheck, mangaSourceComicasoCheck, mangaSourceKumoPoiCheck, mangaSourceMgkomikCheck, mangaSourceCrotpediaCheck, mangaSourceNgomikCheck, mangaSourceKomikTapCheck, mangaSourceManhwaIndoCheck, mangaSourceSoulScansCheck, mangaSourceKuromangaCheck, mangaSourceIsekaiKomikCheck, mangaSourceLuvyaaCheck, mangaSourceSekteDoujinCheck;
     private MaterialSwitch mangaReaderHidePageCounterSwitch, mangaReaderHideBoundaryTextSwitch, mangaModeSwitch, autoLandscapeSwitch, mangaReaderZoomSwitch, mangaReaderPhotoViewZoomSwitch, mangaReaderDoubleTapZoomSwitch, mangaReaderCropBorderSwitch, mangaReaderPageTransitionSwitch, mangaReaderInlinePreloadSwitch, mangaReaderNextChapterAutoSwitch, mangaReaderNextChapterManualSwitch, mangaAutoSaveImageSwitch, hideAnimeLatestEpisodeLabelSwitch, hideMangaLatestChapterLabelSwitch, hideMangaTypeLabelSwitch, hideAllMangaLabelsSwitch, compactMangaDataUiSwitch, boldMangaTitleSwitch;
@@ -147,6 +147,14 @@ public class InfoStatsFragment extends Fragment {
         mangaDetailUiV3Row = view.findViewById(R.id.mangaDetailUiV3Row);
         mangaDetailUiV4Radio = view.findViewById(R.id.mangaDetailUiV4Radio);
         mangaDetailUiV4Row = view.findViewById(R.id.mangaDetailUiV4Row);
+        mangaDetailUiV5Radio = view.findViewById(R.id.mangaDetailUiV5Radio);
+        mangaDetailUiV5Row = view.findViewById(R.id.mangaDetailUiV5Row);
+        mangaDetailUiV6Radio = view.findViewById(R.id.mangaDetailUiV6Radio);
+        mangaDetailUiV6Row = view.findViewById(R.id.mangaDetailUiV6Row);
+        mangaDetailUiV7Radio = view.findViewById(R.id.mangaDetailUiV7Radio);
+        mangaDetailUiV7Row = view.findViewById(R.id.mangaDetailUiV7Row);
+        mangaDetailUiV8Radio = view.findViewById(R.id.mangaDetailUiV8Radio);
+        mangaDetailUiV8Row = view.findViewById(R.id.mangaDetailUiV8Row);
         mangaReaderZoomSwitch = view.findViewById(R.id.mangaReaderZoomSwitch);
         mangaReaderPhotoViewZoomSwitch = view.findViewById(R.id.mangaReaderPhotoViewZoomSwitch);
         mangaReaderDoubleTapZoomSwitch = view.findViewById(R.id.mangaReaderDoubleTapZoomSwitch);
@@ -952,45 +960,37 @@ public class InfoStatsFragment extends Fragment {
             Toast.makeText(requireContext(), "Detail manga: " + MangaSettingsManager.getDetailUiLabel(requireContext()), Toast.LENGTH_SHORT).show();
             refreshStats();
         });
-        if (mangaDetailUiV4Row != null) {
-            mangaDetailUiV4Row.setOnClickListener(v -> {
-                if (updatingMangaDetailUiOptions) return;
-                MangaSettingsManager.setDetailUi(requireContext(), MangaSettingsManager.DETAIL_UI_V4);
-                syncMangaDetailUiSelection();
-                Toast.makeText(requireContext(), "Detail manga: " + MangaSettingsManager.getDetailUiLabel(requireContext()), Toast.LENGTH_SHORT).show();
-                refreshStats();
-            });
-        }
-        if (mangaDetailUiV3Row != null) {
-            mangaDetailUiV3Row.setOnClickListener(v -> {
-                if (updatingMangaDetailUiOptions) return;
-                MangaSettingsManager.setDetailUi(requireContext(), MangaSettingsManager.DETAIL_UI_V3);
-                syncMangaDetailUiSelection();
-                Toast.makeText(requireContext(), "Detail manga: " + MangaSettingsManager.getDetailUiLabel(requireContext()), Toast.LENGTH_SHORT).show();
-                refreshStats();
-            });
-        }
+        if (mangaDetailUiV3Row != null) mangaDetailUiV3Row.setOnClickListener(v -> selectMangaDetailUi(MangaSettingsManager.DETAIL_UI_V3));
+        if (mangaDetailUiV4Row != null) mangaDetailUiV4Row.setOnClickListener(v -> selectMangaDetailUi(MangaSettingsManager.DETAIL_UI_V4));
+        if (mangaDetailUiV5Row != null) mangaDetailUiV5Row.setOnClickListener(v -> selectMangaDetailUi(MangaSettingsManager.DETAIL_UI_V5));
+        if (mangaDetailUiV6Row != null) mangaDetailUiV6Row.setOnClickListener(v -> selectMangaDetailUi(MangaSettingsManager.DETAIL_UI_V6));
+        if (mangaDetailUiV7Row != null) mangaDetailUiV7Row.setOnClickListener(v -> selectMangaDetailUi(MangaSettingsManager.DETAIL_UI_V7));
+        if (mangaDetailUiV8Row != null) mangaDetailUiV8Row.setOnClickListener(v -> selectMangaDetailUi(MangaSettingsManager.DETAIL_UI_V8));
+    }
+
+    private void selectMangaDetailUi(String value) {
+        if (updatingMangaDetailUiOptions) return;
+        MangaSettingsManager.setDetailUi(requireContext(), value);
+        syncMangaDetailUiSelection();
+        Toast.makeText(requireContext(), "Detail manga: " + MangaSettingsManager.getDetailUiLabel(requireContext()), Toast.LENGTH_SHORT).show();
+        refreshStats();
     }
 
     private void syncMangaDetailUiSelection() {
         if (mangaDetailUiRadioGroup == null || !isAdded()) return;
         updatingMangaDetailUiOptions = true;
         String detailUi = MangaSettingsManager.getDetailUi(requireContext());
-        if (MangaSettingsManager.DETAIL_UI_V4.equals(detailUi)) {
-            mangaDetailUiRadioGroup.clearCheck();
-            if (mangaDetailUiV3Radio != null) mangaDetailUiV3Radio.setChecked(false);
-            if (mangaDetailUiV4Radio != null) mangaDetailUiV4Radio.setChecked(true);
-        } else if (MangaSettingsManager.DETAIL_UI_V3.equals(detailUi)) {
-            mangaDetailUiRadioGroup.clearCheck();
-            if (mangaDetailUiV4Radio != null) mangaDetailUiV4Radio.setChecked(false);
-            if (mangaDetailUiV3Radio != null) mangaDetailUiV3Radio.setChecked(true);
-        } else {
-            if (mangaDetailUiV3Radio != null) mangaDetailUiV3Radio.setChecked(false);
-            if (mangaDetailUiV4Radio != null) mangaDetailUiV4Radio.setChecked(false);
-            if (MangaSettingsManager.DETAIL_UI_V2.equals(detailUi)) mangaDetailUiRadioGroup.check(R.id.mangaDetailUiV2Radio);
-            else if (MangaSettingsManager.DETAIL_UI_V1.equals(detailUi)) mangaDetailUiRadioGroup.check(R.id.mangaDetailUiV1Radio);
-            else mangaDetailUiRadioGroup.check(R.id.mangaDetailUiDefaultRadio);
-        }
+        RadioButton[] versionRadios = { mangaDetailUiV3Radio, mangaDetailUiV4Radio, mangaDetailUiV5Radio, mangaDetailUiV6Radio, mangaDetailUiV7Radio, mangaDetailUiV8Radio };
+        for (RadioButton radio : versionRadios) { if (radio != null) radio.setChecked(false); }
+        if (MangaSettingsManager.DETAIL_UI_V3.equals(detailUi)) { mangaDetailUiRadioGroup.clearCheck(); if (mangaDetailUiV3Radio != null) mangaDetailUiV3Radio.setChecked(true); }
+        else if (MangaSettingsManager.DETAIL_UI_V4.equals(detailUi)) { mangaDetailUiRadioGroup.clearCheck(); if (mangaDetailUiV4Radio != null) mangaDetailUiV4Radio.setChecked(true); }
+        else if (MangaSettingsManager.DETAIL_UI_V5.equals(detailUi)) { mangaDetailUiRadioGroup.clearCheck(); if (mangaDetailUiV5Radio != null) mangaDetailUiV5Radio.setChecked(true); }
+        else if (MangaSettingsManager.DETAIL_UI_V6.equals(detailUi)) { mangaDetailUiRadioGroup.clearCheck(); if (mangaDetailUiV6Radio != null) mangaDetailUiV6Radio.setChecked(true); }
+        else if (MangaSettingsManager.DETAIL_UI_V7.equals(detailUi)) { mangaDetailUiRadioGroup.clearCheck(); if (mangaDetailUiV7Radio != null) mangaDetailUiV7Radio.setChecked(true); }
+        else if (MangaSettingsManager.DETAIL_UI_V8.equals(detailUi)) { mangaDetailUiRadioGroup.clearCheck(); if (mangaDetailUiV8Radio != null) mangaDetailUiV8Radio.setChecked(true); }
+        else if (MangaSettingsManager.DETAIL_UI_V2.equals(detailUi)) { mangaDetailUiRadioGroup.check(R.id.mangaDetailUiV2Radio); }
+        else if (MangaSettingsManager.DETAIL_UI_V1.equals(detailUi)) { mangaDetailUiRadioGroup.check(R.id.mangaDetailUiV1Radio); }
+        else { mangaDetailUiRadioGroup.check(R.id.mangaDetailUiDefaultRadio); }
         updatingMangaDetailUiOptions = false;
     }
 
