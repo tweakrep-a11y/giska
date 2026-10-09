@@ -47,26 +47,23 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.ViewList
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -89,11 +86,13 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -408,6 +407,7 @@ private fun DetailV4Screen(
     onGenre: (String, String, String, String) -> Unit
 ) {
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val sourceId = initial?.getSourceId()
     val slug = initial?.slug
 
@@ -580,6 +580,7 @@ private fun DetailV4Screen(
                     type = "text/plain"
                     putExtra(Intent.EXTRA_TEXT, detailShareUrlV4(context, it))
                 }
+
                 context.startActivity(
                     Intent.createChooser(intent, "Bagikan manga")
                 )
@@ -610,7 +611,8 @@ private fun DetailV4Screen(
                         IconButton(onClick = onBack) {
                             Icon(
                                 Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Kembali"
+                                contentDescription = "Kembali",
+                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
 
@@ -620,7 +622,8 @@ private fun DetailV4Screen(
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.weight(1f),
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
 
                         IconButton(
@@ -658,7 +661,8 @@ private fun DetailV4Screen(
                         ) {
                             Icon(
                                 Icons.Default.Share,
-                                contentDescription = "Bagikan manga"
+                                contentDescription = "Bagikan manga",
+                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -671,79 +675,48 @@ private fun DetailV4Screen(
                         LinearProgressIndicator(
                             modifier = Modifier.fillMaxWidth(),
                             color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                            trackColor =
+                                MaterialTheme.colorScheme.surfaceContainerHigh
                         )
                     }
                 }
             }
         },
-        bottomBar = {
-            Surface(
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                contentColor = MaterialTheme.colorScheme.onSurface
-            ) {
-                Column {
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-
-                    Box(
-                        Modifier.fillMaxWidth().padding(
-                            horizontal = 16.dp,
-                            vertical = 10.dp
-                        ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Button(
-                            onClick = {
-                                if (active != null && resumeChapter != null) {
-                                    onChapter(active, resumeChapter, chapters)
-                                }
-                            },
-                            enabled = active != null && resumeChapter != null,
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                                disabledContainerColor =
-                                    MaterialTheme.colorScheme.surfaceContainerHigh,
-                                disabledContentColor =
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            contentPadding = PaddingValues(
-                                horizontal = 16.dp,
-                                vertical = 12.dp
-                            ),
-                            modifier = Modifier.widthIn(max = 640.dp)
-                                .fillMaxWidth()
-                                .heightIn(min = 48.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = null
-                            )
-
-                            Spacer(Modifier.width(10.dp))
-
-                            Text(
-                                when {
-                                    hasResume ->
-                                        "Lanjut membaca Chapter ${
-                                            MangaChapter.formatIndex(
-                                                resumeChapter!!.index
-                                            )
-                                        }"
-                                    resumeChapter != null -> "Mulai membaca"
-                                    loading -> "Memuat chapter…"
-                                    else -> "Chapter belum tersedia"
-                                },
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.labelLarge
-                            )
-                        }
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = {
+                    if (active != null && resumeChapter != null) {
+                        onChapter(active, resumeChapter, chapters)
                     }
-                }
-            }
+                },
+                expanded = true,
+                icon = {
+                    Icon(
+                        Icons.Default.PlayArrow,
+                        contentDescription = null
+                    )
+                },
+                text = {
+                    Text(
+                        when {
+                            hasResume ->
+                                "Lanjut membaca Chapter ${
+                                    MangaChapter.formatIndex(
+                                        resumeChapter!!.index
+                                    )
+                                }"
+                            resumeChapter != null -> "Mulai membaca"
+                            loading -> "Memuat chapter…"
+                            else -> "Chapter belum tersedia"
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                enabled = active != null && resumeChapter != null,
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         }
     ) { padding ->
         BoxWithConstraints(
@@ -775,6 +748,20 @@ private fun DetailV4Screen(
                         manga = active,
                         chapterCount = chapters.size,
                         loading = loading,
+                        onCopyTitle = {
+                            val titleText = active.title.orEmpty()
+                                .ifBlank { "Tanpa judul" }
+
+                            clipboardManager.setText(
+                                AnnotatedString(titleText)
+                            )
+
+                            Toast.makeText(
+                                context,
+                                "Judul disalin",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
                         modifier = Modifier.fillMaxWidth()
                             .heightIn(max = headerMaxHeight)
                             .verticalScroll(headerState)
@@ -832,6 +819,7 @@ private fun DetailV4Header(
     manga: MangaPost,
     chapterCount: Int,
     loading: Boolean,
+    onCopyTitle: () -> Unit,
     modifier: Modifier
 ) {
     Surface(
@@ -875,6 +863,7 @@ private fun DetailV4Header(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.semantics { heading() }
+                            .clickable(onClick = onCopyTitle)
                     )
 
                     Text(
@@ -1197,23 +1186,11 @@ private fun DetailV4Browser(
         mutableStateOf(MangaSettingsManager.isChapterGrid2(context))
     }
 
-    var query by rememberSaveable(manga.slug, manga.getSourceId()) {
-        mutableStateOf("")
-    }
-
-    val shown = remember(chapters, descending, query) {
-        val keyword = query.trim()
-
-        val filtered = chapters.filter {
-            keyword.isBlank() ||
-                it.title.orEmpty().contains(keyword, true) ||
-                MangaChapter.formatIndex(it.index).contains(keyword, true)
-        }
-
+    val shown = remember(chapters, descending) {
         if (descending) {
-            filtered.sortedByDescending { it.index }
+            chapters.sortedByDescending { it.index }
         } else {
-            filtered.sortedBy { it.index }
+            chapters.sortedBy { it.index }
         }
     }
 
@@ -1317,41 +1294,10 @@ private fun DetailV4Browser(
                 }
 
                 if (!showRelated) {
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        label = {
-                            Text("Cari nomor atau judul chapter")
-                        },
-                        leadingIcon = {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = null
-                            )
-                        },
-                        trailingIcon = {
-                            if (query.isNotEmpty()) {
-                                IconButton(onClick = { query = "" }) {
-                                    Icon(
-                                        Icons.Default.Close,
-                                        contentDescription = "Hapus pencarian"
-                                    )
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
                     Text(
-                        if (descending) {
-                            "TERBARU → TERLAMA"
-                        } else {
-                            "TERLAMA → TERBARU"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
+                        "Tarik layar ke bawah untuk memperbarui.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -1439,19 +1385,11 @@ private fun DetailV4Browser(
                     }
                 }
             }
-        } else if (shown.isEmpty()) {
+        } else if (chapters.isEmpty()) {
             item {
                 DetailV4Message(
-                    if (query.isNotBlank()) {
-                        "Chapter tidak ditemukan"
-                    } else {
-                        "Belum ada chapter"
-                    },
-                    if (query.isNotBlank()) {
-                        "Coba nomor atau kata kunci yang berbeda."
-                    } else {
-                        "Tarik layar ke bawah untuk memperbarui."
-                    }
+                    "Belum ada chapter",
+                    "Tarik layar ke bawah untuk memperbarui."
                 )
             }
         } else {
@@ -1558,7 +1496,6 @@ private fun DetailV4ChapterRow(
     }
 
     val total = progress?.totalPages ?: 0
-
     val page = if (total > 0 && progress != null) {
         (progress.page + 1).coerceIn(0, total)
     } else {
@@ -1587,7 +1524,8 @@ private fun DetailV4ChapterRow(
         MangaHistoryManager.getLastReadChapterIndex(context, manga)
     }
 
-    val current = last >= 0f && abs(last - chapter.index) < 0.001f
+    val current = last >= 0f &&
+        abs(last - chapter.index) < 0.001f
 
     val background = when {
         current -> MaterialTheme.colorScheme.primaryContainer
@@ -1632,126 +1570,51 @@ private fun DetailV4ChapterRow(
                 ),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (grid) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        MangaChapter.formatIndex(chapter.index),
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = accent,
-                        modifier = Modifier.weight(1f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+            Text(
+                chapter.title.orEmpty().ifBlank {
+                    "Chapter ${MangaChapter.formatIndex(chapter.index)}"
+                },
+                style = if (grid) {
+                    MaterialTheme.typography.titleSmall
+                } else {
+                    MaterialTheme.typography.titleMedium
+                },
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = foreground
+            )
 
-                    Icon(
-                        if (finished) {
-                            Icons.Default.CheckCircle
-                        } else {
-                            Icons.AutoMirrored.Filled.NavigateNext
-                        },
-                        contentDescription = null,
-                        tint = accent,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    chapter.title.orEmpty().ifBlank {
-                        "Chapter ${MangaChapter.formatIndex(chapter.index)}"
-                    },
-                    style = MaterialTheme.typography.titleSmall,
+                    listOf(
+                        chapter.date.orEmpty(),
+                        when {
+                            finished -> "Selesai"
+                            hasProgress -> "Hal. $page/$total"
+                            current -> "Terakhir dibaca"
+                            else -> "Belum dibaca"
+                        }
+                    ).filter {
+                        it.isNotBlank()
+                    }.joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = secondaryForeground,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    color = foreground
+                    modifier = Modifier.weight(1f)
                 )
 
-                if (!chapter.date.isNullOrBlank()) {
-                    Text(
-                        chapter.date.orEmpty(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = secondaryForeground,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Text(
-                    when {
-                        finished -> "Selesai"
-                        hasProgress -> "Hal. $page/$total"
-                        current -> "Terakhir dibaca"
-                        else -> "Belum dibaca"
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = secondaryForeground,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            } else {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        MangaChapter.formatIndex(chapter.index),
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = accent,
-                        modifier = Modifier.widthIn(
-                            min = 40.dp,
-                            max = 92.dp
-                        ),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    Column(
-                        Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            chapter.title.orEmpty().ifBlank {
-                                "Chapter ${
-                                    MangaChapter.formatIndex(chapter.index)
-                                }"
-                            },
-                            style = MaterialTheme.typography.titleSmall,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            color = foreground
-                        )
-
-                        Text(
-                            listOf(
-                                chapter.date.orEmpty(),
-                                when {
-                                    finished -> "Selesai"
-                                    hasProgress -> "Hal. $page/$total"
-                                    current -> "Terakhir dibaca"
-                                    else -> "Belum dibaca"
-                                }
-                            ).filter {
-                                it.isNotBlank()
-                            }.joinToString(" · "),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = secondaryForeground
-                        )
-                    }
-
+                if (finished) {
                     Icon(
-                        if (finished) {
-                            Icons.Default.CheckCircle
-                        } else {
-                            Icons.AutoMirrored.Filled.NavigateNext
-                        },
-                        contentDescription = null,
-                        tint = accent
+                        Icons.Default.CheckCircle,
+                        contentDescription = "Selesai dibaca",
+                        tint = accent,
+                        modifier = Modifier.padding(start = 8.dp)
+                            .size(18.dp)
                     )
                 }
             }
